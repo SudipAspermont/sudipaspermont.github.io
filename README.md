@@ -1,2 +1,2 @@
-# SudipAspermont.github.io
+# sudipaspermont.github.io
 testing for embedding domo apps
