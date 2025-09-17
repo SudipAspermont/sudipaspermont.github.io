@@ -1,35 +1,185 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>DOMO Embed Test</title>
+  <meta charset="UTF-8" />
+  <title>DOMO Embed Test (with pfilters label)</title>
   <style>
+    :root { --card-bg:#fff; --text:#222; --muted:#666; --border:#ddd; }
     body {
       margin: 0;
-      padding: 0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      background: #f9f9f9;
+      padding: 24px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color: var(--text);
+      background: #f7f7f8;
+      display: grid;
+      gap: 12px;
+      place-content: start center;
+      min-height: 100vh;
     }
+    .label {
+      width: 1440px;
+      box-sizing: border-box;
+      padding: 12px 16px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      line-height: 1.35;
+      font-size: 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #fafafa;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .chip b { color: var(--text); font-weight: 600; }
+    .muted { color: var(--muted); }
     iframe {
       width: 1440px;
       height: 837px;
       border: 1px solid #ccc;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      border-radius: 10px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+      background: #fff;
+    }
+    /* Responsive fallback */
+    @media (max-width: 1500px) {
+      .label, iframe { width: 100%; }
     }
   </style>
 </head>
 <body>
-  <iframe 
-    src="https://embed.domo.com/embed/pages/qQLW0" 
-    width="1440" 
-    height="837" 
-    marginheight="0" 
-    marginwidth="0" 
+  <div id="filterLabel" class="label">
+    <span class="muted">Current filters:</span>
+    <span id="chips"></span>
+  </div>
+
+  <iframe
+    id="domoFrame"
+    src="https://embed.domo.com/embed/pages/qQLW0"
+    width="1440"
+    height="837"
+    marginheight="0"
+    marginwidth="0"
     frameborder="0"
     allowfullscreen>
   </iframe>
+
+  <script>
+    // Attempts to parse a pfilters string that may be URL-encoded JSON or Base64-encoded JSON.
+    function decodePfilters(raw) {
+      if (!raw) return null;
+
+      const tryJSON = (s) => { try { return JSON.parse(s); } catch { return null; } };
+
+      // 1) Try decodeURIComponent + JSON.parse
+      const urlDecoded = (() => { try { return decodeURIComponent(raw); } catch { return raw; } })();
+      let parsed = tryJSON(urlDecoded);
+      if (parsed) return parsed;
+
+      // 2) Try Base64 decode then JSON.parse
+      try {
+        const b64 = atob(raw);
+        parsed = tryJSON(b64);
+        if (parsed) return parsed;
+      } catch (_) { /* ignore */ }
+
+      // 3) Last resort: raw JSON
+      parsed = tryJSON(raw);
+      return parsed;
+    }
+
+    // Extracts pfilters/pfilter from a URL (search params or hash)
+    function getPfiltersFromUrl(url) {
+      try {
+        const u = new URL(url, window.location.origin);
+        const fromSearch = u.searchParams.get('pfilters') || u.searchParams.get('pfilter');
+        if (fromSearch) return decodePfilters(fromSearch);
+
+        // Some setups might stuff it into the hash
+        if (u.hash) {
+          const hash = u.hash.replace(/^#/, '');
+          const hashParams = new URLSearchParams(hash);
+          const fromHash = hashParams.get('pfilters') || hashParams.get('pfilter');
+          if (fromHash) return decodePfilters(fromHash);
+        }
+      } catch (e) {
+        console.warn('Invalid URL or unable to parse pfilters:', e);
+      }
+      return null;
+    }
+
+    // Pretty operator names (optional)
+    const OP_MAP = {
+      EQ: 'is',
+      NE: 'is not',
+      IN: 'in',
+      NOT_IN: 'not in',
+      GT: '>',
+      GTE: '≥',
+      LT: '<',
+      LTE: '≤',
+      BETWEEN: 'between',
+      CONTAINS: 'contains',
+      STARTS_WITH: 'starts with',
+      ENDS_WITH: 'ends with'
+    };
+
+    function renderChips(filters) {
+      const chips = document.getElementById('chips');
+      chips.innerHTML = '';
+
+      if (!filters || !Array.isArray(filters) || filters.length === 0) {
+        chips.innerHTML = '<span class="chip">None</span>';
+        return;
+      }
+
+      filters.forEach(f => {
+        const col = f.column || f.field || 'Unknown';
+        const op = OP_MAP[f.operator] || f.operator || 'is';
+        const vals = f.values ?? (f.value != null ? [f.value] : []);
+        const text = Array.isArray(vals) ? vals.join(', ') : String(vals);
+
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.innerHTML = `<b>${col}</b> ${op} ${text || '∅'}`;
+        chips.appendChild(chip);
+      });
+    }
+
+    function updateLabelFromIframeSrc() {
+      const iframe = document.getElementById('domoFrame');
+      const filters = getPfiltersFromUrl(iframe.src);
+      renderChips(filters);
+    }
+
+    // Initial render
+    updateLabelFromIframeSrc();
+
+    // Watch for runtime changes to iframe src
+    const obs = new MutationObserver(mutations => {
+      for (const m of mutations) {
+        if (m.type === 'attributes' && m.attributeName === 'src') {
+          updateLabelFromIframeSrc();
+        }
+      }
+    });
+    obs.observe(document.getElementById('domoFrame'), { attributes: true });
+
+    // Optional: also update if parent page URL changes (e.g., you append filters to the iframe src)
+    window.addEventListener('hashchange', updateLabelFromIframeSrc);
+  </script>
 </body>
 </html>
