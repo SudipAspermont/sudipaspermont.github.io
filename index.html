@@ -1,123 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>Live iframe URL monitor</title>
-<style>
-  body { font-family: system-ui, sans-serif; margin: 16px; }
-  #list { display: grid; gap: 10px; }
-  .card { border: 1px solid #ddd; border-radius: 8px; padding: 10px 12px; background: #fff; }
-  .hdr { font-weight: 600; color: #333; margin-bottom: 6px; }
-  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; }
-  .row { display: flex; gap: 10px; align-items: center; }
-  button { padding: 6px 10px; border: 1px solid #aaa; border-radius: 6px; background: #f5f5f5; cursor: pointer; }
-  small { color: #666; }
-</style>
+  <meta charset="UTF-8">
+  <title>Show iframe code</title>
 </head>
 <body>
-
-<h1>Live iframe URL monitor</h1>
-<div class="row">
-  <button id="rescanBtn">Rescan iframes</button>
-  <small id="status">Watching…</small>
-</div>
-<div id="list"></div>
-
-<!-- Example DOMO iframe (yours). You can keep/remove this. -->
-<iframe id="domoFrame"
-  src="https://embed.domo.com/embed/pages/qQLW0"
-  width="1248" height="600" frameborder="0"></iframe>
-
-<script>
-(function(){
-  const listEl = document.getElementById('list');
-  const statusEl = document.getElementById('status');
-  const rescanBtn = document.getElementById('rescanBtn');
-
-  // Map of iframe -> observer so we can disconnect when removed
-  const watchers = new Map();
-
-  function idFor(el, idx){
-    // Prefer existing id/name; else build one
-    return el.id || el.name || `iframe-${idx+1}`;
-  }
-
-  function render(){
-    const cards = [];
-    const iframes = Array.from(document.querySelectorAll('iframe'));
-
-    iframes.forEach((ifr, i) => {
-      const id = idFor(ifr, i);
-      const src = ifr.getAttribute('src') || '(no src)';
-      const dims = `${ifr.width || ifr.clientWidth || '-'} × ${ifr.height || ifr.clientHeight || '-'}`;
-
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.dataset._iframeMarker = '1'; // mark for future cleanups
-      card.innerHTML = `
-        <div class="hdr">${id}</div>
-        <div class="mono">${src}</div>
-        <div style="margin-top:6px;"><small>size: ${dims}</small></div>
-      `;
-      cards.push(card);
-    });
-
-    listEl.innerHTML = '';
-    cards.forEach(c => listEl.appendChild(c));
-    statusEl.textContent = `Found ${cards.length} iframe(s).`;
-  }
-
-  function watchIframe(ifr){
-    if (watchers.has(ifr)) return; // already watching
-    const obs = new MutationObserver(muts => {
-      for (const m of muts){
-        if (m.type === 'attributes' && m.attributeName === 'src') {
-          render(); // src changed → refresh list
-        }
-      }
-    });
-    obs.observe(ifr, { attributes: true, attributeFilter: ['src'] });
-    watchers.set(ifr, obs);
-  }
-
-  function unwatchMissing(){
-    // Disconnect observers for iframes no longer in DOM
-    for (const [ifr, obs] of watchers.entries()){
-      if (!document.body.contains(ifr)){
-        obs.disconnect();
-        watchers.delete(ifr);
-      }
-    }
-  }
-
-  function rescan(){
-    // Start/maintain observers
-    const iframes = document.querySelectorAll('iframe');
-    iframes.forEach(watchIframe);
-    unwatchMissing();
-    render();
-  }
-
-  // Watch the whole document for added/removed iframes
-  const treeObserver = new MutationObserver(() => rescan());
-  treeObserver.observe(document.documentElement, { childList: true, subtree: true });
-
-  // As a safety net, also poll occasionally (catches programmatic navigations that miss mutation)
-  const poll = setInterval(rescan, 2000);
-
-  // Manual rescan
-  rescanBtn.addEventListener('click', rescan);
-
-  // Initial
-  rescan();
-
-  // Cleanup if needed (not required on simple pages)
-  window.addEventListener('beforeunload', () => {
-    clearInterval(poll);
-    treeObserver.disconnect();
-    watchers.forEach(obs => obs.disconnect());
-  });
-})();
-</script>
+  <pre>
+&lt;iframe src="https://embed.domo.com/embed/pages/qQLW0" 
+        width="1248" 
+        height="1620" 
+        marginheight="0" 
+        marginwidth="0" 
+        frameborder="0"&gt;&lt;/iframe&gt;
+  </pre>
 </body>
 </html>
