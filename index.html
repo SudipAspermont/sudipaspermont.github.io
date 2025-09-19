@@ -32,6 +32,15 @@
       border-radius: 8px;
       box-shadow: 0 6px 18px rgba(0,0,0,0.08);
     }
+    button {
+      margin-top: 6px;
+      padding: 6px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      border: 1px solid #888;
+      border-radius: 6px;
+      background: #f0f0f0;
+    }
     @media (max-width: 1500px) {
       .info, iframe { width: 100%; }
     }
@@ -48,6 +57,16 @@
     <b>Current filters:</b> <span id="filters">None</span>
   </div>
 
+  <!-- New URL + update button -->
+  <div class="info">
+    <b>New URL:</b>
+    <span id="newUrl">
+      https://embed.domo.com/embed/pages/x68r9?pfilters=%5B%7B%22column%22%3A%22LFT_REGION%22%2C%22dataSourceID%22%3A%22dataset0%22%2C%22dataType%22%3A%22string%22%2C%22operand%22%3A%22IN%22%2C%22values%22%3A%5B%22Europe%2FFSU%22%5D%7D%2C%7B%22column%22%3A%22LFT_CATEGORY%22%2C%22dataSourceID%22%3A%22dataset0%22%2C%22dataType%22%3A%22string%22%2C%22operand%22%3A%22IN%22%2C%22values%22%3A%5B%22Overall%22%5D%7D%2C%7B%22column%22%3A%22LFT_SUBCATEGORY%22%2C%22dataSourceID%22%3A%22dataset0%22%2C%22dataType%22%3A%22string%22%2C%22operand%22%3A%22IN%22%2C%22values%22%3A%5B%22Overall%22%5D%7D%5D
+    </span>
+    <br/>
+    <button id="updateBtn">Click here to update embed</button>
+  </div>
+
   <!-- The iframe -->
   <iframe
     id="domoFrame"
@@ -60,6 +79,8 @@
     const iframe = document.getElementById('domoFrame');
     const urlLabel = document.getElementById('embedUrl');
     const filtersLabel = document.getElementById('filters');
+    const updateBtn = document.getElementById('updateBtn');
+    const newUrl = document.getElementById('newUrl').textContent.trim();
 
     function updateInfo() {
       // Show the iframe src
@@ -76,6 +97,11 @@
 
     // Update automatically if iframe src changes
     new MutationObserver(updateInfo).observe(iframe, { attributes: true, attributeFilter: ['src'] });
+
+    // Button updates the iframe src
+    updateBtn.addEventListener('click', () => {
+      iframe.src = newUrl;
+    });
   </script>
 </body>
 </html>
