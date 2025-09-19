@@ -1,17 +1,81 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Show iframe code</title>
+  <meta charset="UTF-8" />
+  <title>DOMO Embed Test (with URL + pfilters)</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: system-ui, sans-serif;
+      background: #f7f7f8;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .info {
+      width: 1440px;
+      box-sizing: border-box;
+      padding: 10px 16px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #333;
+      line-height: 1.4;
+    }
+    iframe {
+      width: 1440px;
+      height: 837px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+    }
+    @media (max-width: 1500px) {
+      .info, iframe { width: 100%; }
+    }
+  </style>
 </head>
 <body>
-  <pre>
-&lt;iframe src="https://embed.domo.com/embed/pages/qQLW0" 
-        width="1248" 
-        height="1620" 
-        marginheight="0" 
-        marginwidth="0" 
-        frameborder="0"&gt;&lt;/iframe&gt;
-  </pre>
+  <!-- Embed URL label -->
+  <div class="info">
+    <b>Embed URL:</b> <span id="embedUrl"></span>
+  </div>
+
+  <!-- Filters label -->
+  <div class="info">
+    <b>Current filters:</b> <span id="filters">None</span>
+  </div>
+
+  <!-- The iframe -->
+  <iframe
+    id="domoFrame"
+    src="https://embed.domo.com/embed/pages/qQLW0"
+    frameborder="0"
+    allowfullscreen>
+  </iframe>
+
+  <script>
+    const iframe = document.getElementById('domoFrame');
+    const urlLabel = document.getElementById('embedUrl');
+    const filtersLabel = document.getElementById('filters');
+
+    function updateInfo() {
+      // Show the iframe src
+      urlLabel.textContent = iframe.src;
+
+      // Grab pfilters if present
+      const u = new URL(iframe.src, window.location.origin);
+      const pf = u.searchParams.get('pfilters') || u.searchParams.get('pfilter');
+      filtersLabel.textContent = pf ? pf : 'None';
+    }
+
+    // Initial display
+    updateInfo();
+
+    // Update automatically if iframe src changes
+    new MutationObserver(updateInfo).observe(iframe, { attributes: true, attributeFilter: ['src'] });
+  </script>
 </body>
 </html>
