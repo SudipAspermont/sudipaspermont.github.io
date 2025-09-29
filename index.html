@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>DOMO Embed</title>
+  <title>DOMO Embed.2</title>
   <style>
     body {
       margin: 0;
@@ -32,12 +32,27 @@
 
   <!-- Your tracking / postMessage listener script goes here -->
   <script>
-    const frame = document.getElementById('domoFrame');
+     const frame = document.getElementById('domoFrame');
 
-    window.addEventListener('message', (e) => {
-      if (!e.data || e.data.type !== 'domo:navigate') return;
-      console.log('Domo state:', e.data.payload);
+  // Show URL whenever the iframe loads
+  frame.addEventListener('load', () => {
+    console.log('iframe loaded:', frame.src);
+  });
+
+  // Show URL if it changes (e.g., different pfilters/page)
+  new MutationObserver(muts => {
+    muts.forEach(m => {
+      if (m.type === 'attributes' && m.attributeName === 'src') {
+        console.log('iframe src changed:', frame.src);
+      }
     });
+  }).observe(frame, { attributes: true, attributeFilter: ['src'] });
+
+  // Listen for postMessages (if your brick sends them)
+  window.addEventListener('message', (e) => {
+    if (!e.data || e.data.type !== 'domo:navigate') return;
+    console.log('Domo state via postMessage:', e.data.payload);
+  });
   </script>
 </body>
 </html>
