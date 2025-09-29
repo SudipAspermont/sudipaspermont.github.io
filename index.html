@@ -4,73 +4,106 @@
   <meta charset="UTF-8">
   <title>DOMO Embed with Tracking</title>
   <style>
-    body {
-      margin: 0;
-      font-family: system-ui, sans-serif;
-      background: #f7f7f8;
-    }
-    #log {
-      background: #222;
-      color: #0f0;
-      padding: 10px;
-      font-size: 14px;
-      font-family: monospace;
-      white-space: pre-wrap;
-      border-bottom: 2px solid #555;
-      max-height: 200px;
-      overflow-y: auto;
-    }
-    iframe {
-      display: block;
-      margin: 20px auto;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      box-shadow: 0 6px 18px rgba(0,0,0,0.1);
-    }
+    body { margin: 0; font-family: system-ui, sans-serif; background: #f7f7f8; }
+    #log { background: #222; color: #0f0; padding: 10px; font: 14px/1.4 monospace; border-bottom: 2px solid #555; max-height: 220px; overflow-y: auto; }
+    #status { background: #fff; padding: 10px 12px; border-bottom: 1px solid #ddd; font-size: 14px; }
+    iframe { display: block; margin: 16px auto; border: 1px solid #ccc; border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.1); }
+    .muted { color: #666; }
   </style>
 </head>
 <body>
-  <!-- Log area -->
+  <div id="status">
+    <strong>Current:</strong>
+    <span id="curSrc" class="muted">—</span>
+    <span id="curLevel" class="muted"></span>
+    <div id="curFilters" class="muted">Waiting for URL change or postMessage…</div>
+  </div>
+
   <div id="log">[Tracking log will appear here]</div>
 
-  <!-- The DOMO iframe -->
-  <iframe 
+  <iframe
     id="domoFrame"
-    src="https://embed.domo.com/embed/pages/qQLW0" 
-    width="1248" 
-    height="1620" 
-    frameborder="0">
+    src="https://embed.domo.com/embed/pages/qQLW0"
+    width="1248" height="1620" frameborder="0">
   </iframe>
 
   <script>
     const frame = document.getElementById('domoFrame');
     const logBox = document.getElementById('log');
+    const curSrc = document.getElementById('curSrc');
+    const curLevel = document.getElementById('curLevel');
+    const curFilters = document.getElementById('curFilters');
+
+    const state = { src: null, filtersJson: null, level: null };
 
     function log(msg, data) {
-      const line = `[${new Date().toLocaleTimeString()}] ${msg}` +
-        (data ? ' ' + JSON.stringify(data) : '');
+      const line = `[${new Date().toLocaleTimeString()}] ${msg}` + (data ? ' ' + JSON.stringify(data) : '');
       console.log(line);
       logBox.textContent = line + "\n" + logBox.textContent;
     }
 
-    // 1) Show URL when iframe loads
-    frame.addEventListener('load', () => {
-      log('iframe loaded', { src: frame.src });
-    });
+    function decodePfilters(url) {
+      try {
+        const u = new URL(url);
+        const pf = u.searchParams.get('pfilters');
+        if (!pf) return null;
+        return JSON.parse(decodeURIComponent(pf));
+      } catch { return null; }
+    }
 
-    // 2) Watch for iframe src attribute changes
+    function inferLevel(filters) {
+      if (!filters || !filters.length) return 'world';
+      const hasJur = filters.some(f => f.column === 'LFT_JURISDICTION' && f.values?.length);
+      const hasReg = filters.some(f => f.column === 'LFT_REGION' && f.values?.length);
+      if (hasJur) return 'jurisdiction';
+      if (hasReg) return 'region';
+      return 'world';
+    }
+
+    function renderStatus(src, filters) {
+      curSrc.textContent = src || '—';
+      const lvl = inferLevel(filters);
+      curLevel.textContent = ` | Level: ${lvl}`;
+      curFilters.textContent = filters ? JSON.stringify(filters) : '(no pfilters in URL)';
+      state.level = lvl;
+    }
+
+    function updateFromSrc(tag) {
+      const src = frame.src;
+      const filters = decodePfilters(src);
+      const filtersJson = filters ? JSON.stringify(filters) : null;
+
+      // no-op if nothing changed
+      if (state.src === src && state.filtersJson === filtersJson) return;
+
+      state.src = src;
+      state.filtersJson = filtersJson;
+      renderStatus(src, filters);
+      log(tag, { src, pfilters: filters });
+    }
+
+    // 1) On iframe load
+    frame.addEventListener('load', () => updateFromSrc('iframe loaded'));
+
+    // 2) If something (your code) ever changes frame.src
     new MutationObserver(muts => {
-      muts.forEach(m => {
+      for (const m of muts) {
         if (m.type === 'attributes' && m.attributeName === 'src') {
-          log('iframe src changed', { src: frame.src });
+          updateFromSrc('iframe src changed');
         }
-      });
+      }
     }).observe(frame, { attributes: true, attributeFilter: ['src'] });
 
-    // 3) Listen for postMessages from inside Domo brick
+    // 3) Listen for postMessages from inside the Domo brick
     window.addEventListener('message', (e) => {
+      // tighten this: if (e.origin !== 'https://embed.domo.com') return;
       if (!e.data || e.data.type !== 'domo:navigate') return;
-      log('Domo state via postMessage', e.data.payload);
+      const payload = e.data.payload || {};
+      // Show postMessage-driven state prominently
+      curSrc.textContent = state.src || '(src unchanged)';
+      curLevel.textContent = ` | Level: ${payload.level || 'unknown'}`;
+      curFilters.textContent = payload.pfilters ? JSON.stringify(payload.pfilters) : '(no pfilters in message)';
+      log('Domo state via postMessage', payload);
     });
   </script>
 </body>
