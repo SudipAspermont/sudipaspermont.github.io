@@ -1,131 +1,32 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>DOMO Embed Test (Parent-controlled URL + pfilters)</title>
+  <meta charset="UTF-8">
+  <title>DOMO Embed</title>
   <style>
     body {
-      margin: 0; padding: 20px; font-family: system-ui, sans-serif;
-      background: #f7f7f8; display: flex; flex-direction: column; align-items: center; gap: 12px;
+      margin: 0;
+      padding: 20px;
+      font-family: system-ui, sans-serif;
+      background: #f7f7f8;
+      display: flex;
+      justify-content: center;
     }
-    .info {
-      width: 1440px; box-sizing: border-box; padding: 10px 16px;
-      background: #fff; border: 1px solid #ddd; border-radius: 8px;
-      font-size: 14px; color: #333; line-height: 1.4; overflow-wrap: anywhere;
-    }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
     iframe {
-      width: 1440px; height: 837px; border: 1px solid #ccc;
-      border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.1);
     }
-    button {
-      margin-top: 6px; padding: 6px 12px; font-size: 14px; cursor: pointer;
-      border: 1px solid #888; border-radius: 6px; background: #f0f0f0;
-    }
-    pre {
-      margin: 6px 0 0; padding: 8px; background: #fafafa;
-      border: 1px solid #eee; border-radius: 6px; max-height: 220px; overflow: auto;
-    }
-    @media (max-width: 1500px) { .info, iframe { width: 100%; } }
   </style>
 </head>
 <body>
-  <!-- What the parent told the iframe to load -->
-  <div class="info">
-    <b>You told it to load (parent-controlled):</b>
-    <div>URL: <span id="plannedUrl" class="mono"></span></div>
-    <div>Page ID: <span id="plannedId" class="mono"></span></div>
-    <div style="margin-top:6px;">
-      <b>Decoded pfilters:</b>
-      <pre id="plannedFilters">(None)</pre>
-    </div>
-  </div>
-
-  <!-- Current iframe src (for sanity; should match planned when you control it) -->
-  <div class="info">
-    <b>Iframe <code>src</code> attribute (current):</b>
-    <div><span id="embedUrl" class="mono"></span></div>
-  </div>
-
-  <!-- New URL + update button -->
-  <div class="info">
-    <b>New URL to set:</b>
-    <div id="newUrl" class="mono">
-      https://embed.domo.com/embed/pages/x68r9?pfilters=%5B%7B%22column%22%3A%22LFT_REGION%22%2C%22dataSourceID%22%3A%22dataset0%22%2C%22dataType%22%3A%22string%22%2C%22operand%22%3A%22IN%22%2C%22values%22%3A%5B%22Europe%2FFSU%22%5D%7D%2C%7B%22column%22%3A%22LFT_CATEGORY%22%2C%22dataSourceID%22%3A%22dataset0%22%2C%22dataType%22%3A%22string%22%2C%22operand%22%3A%22IN%22%2C%22values%22%3A%5B%22Overall%22%5D%7D%2C%7B%22column%22%3A%22LFT_SUBCATEGORY%22%2C%22dataSourceID%22%3A%22dataset0%22%2C%22dataType%22%3A%22string%22%2C%22operand%22%3A%22IN%22%2C%22values%22%3A%5B%22Overall%22%5D%7D%5D
-    </div>
-    <button id="updateBtn">Click here to update embed</button>
-  </div>
-
-  <!-- The iframe -->
-  <iframe
-    id="domoFrame"
-    src="https://embed.domo.com/embed/pages/qQLW0"
-    frameborder="0"
-    allowfullscreen>
+  <iframe 
+    src="https://embed.domo.com/embed/pages/qQLW0" 
+    width="1248" 
+    height="1620" 
+    marginheight="0" 
+    marginwidth="0" 
+    frameborder="0">
   </iframe>
-
-  <script>
-    const iframe        = document.getElementById('domoFrame');
-    const embedUrlEl    = document.getElementById('embedUrl');
-    const plannedUrlEl  = document.getElementById('plannedUrl');
-    const plannedIdEl   = document.getElementById('plannedId');
-    const plannedFiltersPre = document.getElementById('plannedFilters');
-    const updateBtn     = document.getElementById('updateBtn');
-    const newUrlText    = document.getElementById('newUrl').textContent.trim();
-
-    let lastPlannedUrl = null; // what the parent last set
-
-    function extractPageId(urlString) {
-      const m = String(urlString).match(/\/pages\/([A-Za-z0-9]+)/);
-      return m ? m[1] : '(unknown)';
-    }
-
-    function decodePfilters(urlString) {
-      try {
-        const u = new URL(urlString, window.location.origin);
-        const raw = u.searchParams.get('pfilters') || u.searchParams.get('pfilter');
-        if (!raw) return '(None)';
-        const decoded = decodeURIComponent(raw);
-        try {
-          return JSON.stringify(JSON.parse(decoded), null, 2);
-        } catch {
-          return decoded; // show raw decoded if not JSON
-        }
-      } catch {
-        return '(None)';
-      }
-    }
-
-    function renderPlanned(url) {
-      plannedUrlEl.textContent = url || '(none)';
-      plannedIdEl.textContent  = extractPageId(url || '');
-      plannedFiltersPre.textContent = decodePfilters(url || '');
-    }
-
-    function renderIframeSrc() {
-      embedUrlEl.textContent = iframe.src || '(none)';
-    }
-
-    // Core: parent-controlled navigation
-    function setEmbed(url) {
-      lastPlannedUrl = url;
-      // update labels first (instant feedback)
-      renderPlanned(url);
-      // then actually navigate the iframe
-      iframe.src = url;
-    }
-
-    // Initial render (reflect the default src you shipped with)
-    renderPlanned(iframe.src); // show starting state as "planned"
-    renderIframeSrc();
-
-    // Keep the “current iframe src” label synced when src attribute changes
-    new MutationObserver(renderIframeSrc)
-      .observe(iframe, { attributes: true, attributeFilter: ['src'] });
-    iframe.addEventListener('load', renderIframeSrc);
-
-    // Button: set to the long URL from the “New URL” box
-    updateBtn.addEventListener('click', () => setEmbed(newUrlText));
-  </script>
 </body>
 </html>
