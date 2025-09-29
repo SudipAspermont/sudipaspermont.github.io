@@ -2,17 +2,27 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>DOMO Embed.2</title>
+  <title>DOMO Embed with Tracking</title>
   <style>
     body {
       margin: 0;
-      padding: 20px;
       font-family: system-ui, sans-serif;
       background: #f7f7f8;
-      display: flex;
-      justify-content: center;
+    }
+    #log {
+      background: #222;
+      color: #0f0;
+      padding: 10px;
+      font-size: 14px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      border-bottom: 2px solid #555;
+      max-height: 200px;
+      overflow-y: auto;
     }
     iframe {
+      display: block;
+      margin: 20px auto;
       border: 1px solid #ccc;
       border-radius: 8px;
       box-shadow: 0 6px 18px rgba(0,0,0,0.1);
@@ -20,39 +30,48 @@
   </style>
 </head>
 <body>
+  <!-- Log area -->
+  <div id="log">[Tracking log will appear here]</div>
+
+  <!-- The DOMO iframe -->
   <iframe 
     id="domoFrame"
     src="https://embed.domo.com/embed/pages/qQLW0" 
     width="1248" 
     height="1620" 
-    marginheight="0" 
-    marginwidth="0" 
     frameborder="0">
   </iframe>
 
-  <!-- Your tracking / postMessage listener script goes here -->
   <script>
-     const frame = document.getElementById('domoFrame');
+    const frame = document.getElementById('domoFrame');
+    const logBox = document.getElementById('log');
 
-  // Show URL whenever the iframe loads
-  frame.addEventListener('load', () => {
-    console.log('iframe loaded:', frame.src);
-  });
+    function log(msg, data) {
+      const line = `[${new Date().toLocaleTimeString()}] ${msg}` +
+        (data ? ' ' + JSON.stringify(data) : '');
+      console.log(line);
+      logBox.textContent = line + "\n" + logBox.textContent;
+    }
 
-  // Show URL if it changes (e.g., different pfilters/page)
-  new MutationObserver(muts => {
-    muts.forEach(m => {
-      if (m.type === 'attributes' && m.attributeName === 'src') {
-        console.log('iframe src changed:', frame.src);
-      }
+    // 1) Show URL when iframe loads
+    frame.addEventListener('load', () => {
+      log('iframe loaded', { src: frame.src });
     });
-  }).observe(frame, { attributes: true, attributeFilter: ['src'] });
 
-  // Listen for postMessages (if your brick sends them)
-  window.addEventListener('message', (e) => {
-    if (!e.data || e.data.type !== 'domo:navigate') return;
-    console.log('Domo state via postMessage:', e.data.payload);
-  });
+    // 2) Watch for iframe src attribute changes
+    new MutationObserver(muts => {
+      muts.forEach(m => {
+        if (m.type === 'attributes' && m.attributeName === 'src') {
+          log('iframe src changed', { src: frame.src });
+        }
+      });
+    }).observe(frame, { attributes: true, attributeFilter: ['src'] });
+
+    // 3) Listen for postMessages from inside Domo brick
+    window.addEventListener('message', (e) => {
+      if (!e.data || e.data.type !== 'domo:navigate') return;
+      log('Domo state via postMessage', e.data.payload);
+    });
   </script>
 </body>
 </html>
