@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>DOMO Embed. v2</title>
+  <title>DOMO Embed</title>
   <style>
     body {
       margin: 0;
@@ -20,45 +20,24 @@
   </style>
 </head>
 <body>
- <iframe
-  id="domoFrame"
-  src="https://embed.domo.com/embed/pages/4Qp3J"
-  width="1248" height="1620" frameborder="0">
-</iframe>
+  <iframe 
+    id="domoFrame"
+    src="https://embed.domo.com/embed/pages/qQLW0" 
+    width="1248" 
+    height="1620" 
+    marginheight="0" 
+    marginwidth="0" 
+    frameborder="0">
+  </iframe>
 
-<script>
-const frame = document.getElementById('domoFrame');
+  <!-- Your tracking / postMessage listener script goes here -->
+  <script>
+    const frame = document.getElementById('domoFrame');
 
-function decodePfilters(url) {
-  try {
-    const u = new URL(url);
-    const pf = u.searchParams.get('pfilters');
-    if (!pf) return null;
-    return JSON.parse(decodeURIComponent(pf));
-  } catch (e) {
-    return null;
-  }
-}
-
-function logState(tag) {
-  const pfilters = decodePfilters(frame.src);
-  console.log(tag, { src: frame.src, pfilters });
-  // Example: push to analytics
-  window.dataLayer = window.dataLayer || [];
-  window.dataLayer.push({ event: 'domoPfilters', src: frame.src, pfilters });
-}
-
-// Fires when iframe reloads (e.g., when you navigate to x68r9?pfilters=...)
-frame.addEventListener('load', () => logState('iframe loaded'));
-
-// Detect programmatic changes to frame.src (if your code sets it)
-new MutationObserver(muts => {
-  for (const m of muts) {
-    if (m.type === 'attributes' && m.attributeName === 'src') {
-      logState('iframe src changed');
-    }
-  }
-}).observe(frame, { attributes: true, attributeFilter: ['src'] });
-</script>
+    window.addEventListener('message', (e) => {
+      if (!e.data || e.data.type !== 'domo:navigate') return;
+      console.log('Domo state:', e.data.payload);
+    });
+  </script>
 </body>
 </html>
