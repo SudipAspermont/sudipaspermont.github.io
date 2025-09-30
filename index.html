@@ -1,29 +1,20 @@
-
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>DOMO Embed with Tracking + Filter Button</title>
+  <title>DOMO Embed with Tracking + Dynamic Category/Subcategory Filters</title>
   <style>
     body { margin: 0; font-family: system-ui, sans-serif; background: #f7f7f8; }
     #log { background: #222; color: #0f0; padding: 10px; font: 14px/1.4 monospace; border-bottom: 2px solid #555; max-height: 220px; overflow-y: auto; }
     #status { background: #fff; padding: 10px 12px; border-bottom: 1px solid #ddd; font-size: 14px; }
     iframe { display: block; margin: 16px auto; border: 1px solid #ccc; border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.1); }
     .muted { color: #666; }
-
-    .controls {
-      max-width: 1200px;
-      margin: 16px auto 0;
-      text-align: center;
-    }
-    #updateBtn {
-      padding: 10px 16px; border: 0; border-radius: 10px;
-      background: #0d6efd; color: #fff; font-weight: 600; cursor: pointer;
-      box-shadow: 0 4px 10px rgba(13,110,253,0.25);
-    }
-    #updateBtn:hover { filter: brightness(1.05); }
+    .controls { max-width: 1200px; margin: 16px auto 0; text-align: center; display: grid; gap: 10px; grid-template-columns: repeat(3, max-content); align-items: center; justify-content: center; }
+    select { padding: 8px 10px; border-radius: 10px; border: 1px solid #ccc; background:#fff; }
+    #applyBtn, #resetBtn { padding: 10px 16px; border: 0; border-radius: 10px; background: #0d6efd; color: #fff; font-weight: 600; cursor: pointer; box-shadow: 0 4px 10px rgba(13,110,253,0.25); }
+    #resetBtn { background: #6c757d; }
+    #applyBtn:hover, #resetBtn:hover { filter: brightness(1.05); }
+    label { font-size: 14px; margin-right: 6px; }
   </style>
 </head>
 <body>
@@ -40,7 +31,32 @@
 
   <!-- Controls -->
   <div class="controls">
-    <button id="updateBtn">Filter</button>
+    <div>
+      <label for="catSel">LFT_CATEGORY</label>
+      <select id="catSel">
+        <option value="Overall" selected>Overall</option>
+        <option value="Hard">Hard</option>
+        <option value="Perceived">Perceived</option>
+      </select>
+    </div>
+
+    <div>
+      <label for="subSel">LFT_SUBCATEGORY</label>
+      <select id="subSel">
+        <option value="Overall" selected>Overall</option>
+        <option value="Legal Risk">Legal Risk</option>
+        <option value="Governance Risk">Governance Risk</option>
+        <option value="Social Risk">Social Risk</option>
+        <option value="Environmental Risk">Environmental Risk</option>
+        <option value="Fiscal Risk">Fiscal Risk</option>
+        <option value="Infrastructure Risk">Infrastructure Risk</option>
+      </select>
+    </div>
+
+    <div>
+      <button id="applyBtn">Filter</button>
+      <button id="resetBtn" title="Back to world page (no pfilters)">Reset</button>
+    </div>
   </div>
 
   <!-- The DOMO iframe -->
@@ -51,19 +67,26 @@
   </iframe>
 
   <script>
+    // ---- Elements ----
     const frame = document.getElementById('domoFrame');
     const logBox = document.getElementById('log');
     const curSrc = document.getElementById('curSrc');
     const curLevel = document.getElementById('curLevel');
     const curFilters = document.getElementById('curFilters');
-    const updateBtn = document.getElementById('updateBtn');
+    const applyBtn = document.getElementById('applyBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const catSel = document.getElementById('catSel');
+    const subSel = document.getElementById('subSel');
 
-    // 🔒 Hidden long URL
-    
-    const FILTER_URL = "https://embed.domo.com/embed/pages/x68r9?pfilters=%5B%7B%22column%22%3A%22LFT_REGION%22%2C%22dataSourceID%22%3A%22dataset0%22%2C%22dataType%22%3A%22string%22%2C%22operand%22%3A%22IN%22%2C%22values%22%3A%5B%22Europe%2FFSU%22%5D%7D%2C%7B%22column%22%3A%22LFT_CATEGORY%22%2C%22dataSourceID%22%3A%22dataset0%22%2C%22dataType%22%3A%22string%22%2C%22operand%22%3A%22IN%22%2C%22values%22%3A%5B%22Hard%22%5D%7D%2C%7B%22column%22%3A%22LFT_SUBCATEGORY%22%2C%22dataSourceID%22%3A%22dataset0%22%2C%22dataType%22%3A%22string%22%2C%22operand%22%3A%22IN%22%2C%22values%22%3A%5B%22Legal%20Risk%22%5D%7D%5D";
+    // ---- Config ----
+    const WORLD_PAGE_URL = "https://embed.domo.com/embed/pages/qQLW0"; // world level
+    const REGION_PAGE_BASE = "https://embed.domo.com/embed/pages/x68r9"; // region-level page (expects pfilters)
+    const DATASET_ID = "dataset0";
 
+    // ---- State ----
     const state = { src: null, filtersJson: null, level: null };
 
+    // ---- Helpers ----
     function log(msg, data) {
       const line = `[${new Date().toLocaleTimeString()}] ${msg}` + (data ? ' ' + JSON.stringify(data) : '');
       console.log(line);
@@ -101,7 +124,7 @@
       const filters = decodePfilters(src);
       const filtersJson = filters ? JSON.stringify(filters) : null;
 
-      if (state.src === src && state.filtersJson === filtersJson) return;
+      if (state.src === src && state.filtersJson === filtersJson) return; // avoid duplicate logs
 
       state.src = src;
       state.filtersJson = filtersJson;
@@ -109,10 +132,20 @@
       log(tag, { src, pfilters: filters });
     }
 
-    // On iframe load
+    function buildPfiltersUrl(category, subcategory) {
+      // Build the pfilters array using the two selections
+      const filters = [
+        { column: 'LFT_CATEGORY', dataSourceID: DATASET_ID, dataType: 'string', operand: 'IN', values: [category] },
+        { column: 'LFT_SUBCATEGORY', dataSourceID: DATASET_ID, dataType: 'string', operand: 'IN', values: [subcategory] }
+      ];
+      const json = JSON.stringify(filters);
+      const encoded = encodeURIComponent(json);
+      return `${REGION_PAGE_BASE}?pfilters=${encoded}`;
+    }
+
+    // ---- Wiring ----
     frame.addEventListener('load', () => updateFromSrc('iframe loaded'));
 
-    // Watch for iframe src changes
     new MutationObserver(muts => {
       for (const m of muts) {
         if (m.type === 'attributes' && m.attributeName === 'src') {
@@ -121,7 +154,7 @@
       }
     }).observe(frame, { attributes: true, attributeFilter: ['src'] });
 
-    // Listen for postMessages from Domo brick
+    // Listen for postMessages from Domo brick (optional if your brick emits these)
     window.addEventListener('message', (e) => {
       if (!e.data || e.data.type !== 'domo:navigate') return;
       const payload = e.data.payload || {};
@@ -131,10 +164,23 @@
       log('Domo state via postMessage', payload);
     });
 
-    // Button action
-    updateBtn.addEventListener('click', () => {
-      log('button: setting iframe src', { src: FILTER_URL });
-      frame.src = FILTER_URL;
+    // Apply: always enabled (defaults are "Overall", "Overall")
+    applyBtn.addEventListener('click', () => {
+      const cat = catSel.value?.trim();
+      const sub = subSel.value?.trim();
+      if (!cat || !sub) {
+        alert('Please select both LFT_CATEGORY and LFT_SUBCATEGORY.');
+        return;
+      }
+      const url = buildPfiltersUrl(cat, sub);
+      log('apply: setting iframe src', { src: url });
+      frame.src = url;
+    });
+
+    // Reset back to world page (no pfilters)
+    resetBtn.addEventListener('click', () => {
+      log('reset: setting iframe src', { src: WORLD_PAGE_URL });
+      frame.src = WORLD_PAGE_URL;
     });
   </script>
 </body>
